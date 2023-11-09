@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Objection.lol Courtroom Enhancer
-// @namespace    https://github.com/w452tr4w5etgre/
+// @namespace    https://github.com/massahmassah/
 // @description  Enhances Objection.lol Courtroom functionality
-// @version      0.886
-// @author       w452tr4w5etgre
-// @homepage     https://github.com/w452tr4w5etgre/courtroom-enhancer
+// @version      0.887
+// @author       mp (w452tr4w5etgre)
+// @homepage     https://github.com/massahmassah/courtroom-enhancer
 // @match        https://objection.lol/courtroom/*
-// @icon         https://github.com/w452tr4w5etgre/courtroom-enhancer/raw/main/logo.png
-// @downloadURL  https://github.com/w452tr4w5etgre/courtroom-enhancer/raw/main/courtroomenhancer.user.js
-// @updateURL    https://github.com/w452tr4w5etgre/courtroom-enhancer/raw/main/courtroomenhancer.user.js
+// @icon         https://github.com/massahmassah/courtroom-enhancer/raw/main/logo.png
+// @downloadURL  https://github.com/massahmassah/courtroom-enhancer/raw/main/courtroomenhancer.user.js
+// @updateURL    https://github.com/massahmassah/courtroom-enhancer/raw/main/courtroomenhancer.user.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_listValues
@@ -49,6 +49,7 @@
         "separateSoundVolumes": getSetting("separateSoundVolumes", false),
         "bgmVol": getSetting("bgmVol", 100),
         "sfxVol": getSetting("sfxVol", 100),
+        "apiToken": getSetting("apiToken", null),
     };
 
     const URL_REGEX = /(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9]{1,8}(?:\:\d{1,5})?\b(?:\/\S*)*)/gi;
@@ -196,7 +197,7 @@
             const errorWatcher = _CE_.$vue.$watch("$store.state.courtroom.error.title", errorText => {
                 if (errorText !== "Disconnected") return;
                 _CE_.$vue.$store.state.courtroom.error.text += "\nReason: " + socketError;
-                errorWatcher(); //Unwatch 
+                errorWatcher(); //Unwatch
             }, { once: true });
         }, { once: true });
 
@@ -423,6 +424,33 @@
                         }
                     }
                 }],
+                ["take2space", {
+                    method: "POST",
+                    formatDataFile(data) {
+                        return {
+                            headers: { "token": _CE_.options.apiToken},
+                            data: _CE_.Uploader.parseForm({ "files[]": data })
+                        };
+                    },
+                    formatDataUrl(data) {
+                        return {
+                            headers: { "Content-Type": "application/x-www-form-urlencoded",
+                                     "token": _CE_.options.apiToken},
+                            data: _CE_.Uploader.parseParams({ "urls[]": data })
+                        };
+                    },
+                    urlFromResponse(response) {
+                        const responseJSON = JSON.parse(response);
+                        if (!responseJSON.success) {
+                            throw new Error("Server returned " + responseJSON.description);
+                        }
+                        for (const file of responseJSON.files) {
+                            if (file.url) {
+                                return file.url;
+                            }
+                        }
+                    }
+                }],
                 ["h4g", {
                     method: "POST",
                     formatDataFile(data) {
@@ -474,7 +502,7 @@
                 ["takemetospace", {
                     name: "take-me-to.space",
                     url: "https://take-me-to.space/api/upload",
-                    api: "lolisafe",
+                    api: "take2space",
                     maxsize: 50e6,
                     supported: new Map([["audio", true], ["urls", false], ["m4a", false]])
                 }],
@@ -1717,6 +1745,18 @@
                 }
             });
 
+            ui.extraSettings_apiToken = new createInputText({
+                value: _CE_.options.apiToken,
+                label: "API token",
+                title: "API token for take-me-to.space",
+                type: "text",
+                maxWidth: "max-content",
+                onfocusout: ev => {
+                    const value = ev.target.value;
+                    setSetting("apiToken", value);
+                }
+            });
+
             ui.extraSettings_chatlogHighlightsSoundVolume = new createInputText({
                 value: _CE_.options.chatlog_highlights_sound_volume,
                 label: "Volume: " + _CE_.options.chatlog_highlights_sound_volume,
@@ -1908,6 +1948,7 @@
                 ui.extraSettings_disableKeyboardShortcuts,
                 ui.extraSettings_textboxStyleSelector,
                 ui.extraSettings_fileHostSelector,
+                ui.extraSettings_apiToken,
                 ui.extraSettings_showRoulettes,
                 ui.extraSettings_separateSoundVolumes,
                 ui.extraSettings_bgmVol,
